@@ -46,3 +46,25 @@ export const deleteProduct = async (id: number): Promise<void> => {
     throw new Error('Failed to delete product');
   }
 };
+
+export const addToCart = async (productId: number, quantity: number) => {
+  const response = await fetch(`${API_URL}/cart`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ product_id: productId, quantity }),
+  });
+  if (!response.ok) {
+    const msg = await response.text();
+    throw new Error(msg || 'Failed to add to cart');
+  }
+  return response.json() as Promise<{
+    cart: Record<number, number>;
+    remaining_stock: Record<number, number>;
+  }>;
+};
+
+export const getCart = async () => {
+  const response = await fetch(`${API_URL}/cart`, { method: 'GET' });
+  if (!response.ok) throw new Error('Failed to fetch cart');
+  return response.json() as Promise<Record<number, number>>;
+};

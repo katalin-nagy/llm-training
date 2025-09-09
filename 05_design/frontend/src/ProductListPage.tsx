@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getProducts, deleteProduct } from './api';
+import { getProducts, deleteProduct, addToCart, getCart } from './api';
+import Cart, { CartItem } from './components/Cart';
 import { Product } from './types/Product';
 import Button from './components/Button';
 import AddProductModal from './components/AddProductModal';
@@ -21,6 +22,7 @@ const ProductListPage: React.FC = () => {
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
   const fetchProducts = async () => {
     try {
@@ -36,6 +38,26 @@ const ProductListPage: React.FC = () => {
   useEffect(() => {
     fetchProducts();
   }, []);
+
+  useEffect(() => {
+  (async () => {
+    try {
+      const cartMap = await getCart(); // { [productId]: qty }
+      setCartItems((prev) => {
+        const map = new Map<number, CartItem>(prev.map(i => [i.product.id, i]));
+        // Rehydrate items only for products we have loaded
+        for (const [pidStr, qty] of Object.entries(cartMap)) {
+          const pid = Number(pidStr);
+          const p = products.find(pr => pr.id === pid);
+          if (p) map.set(pid, { product: p, quantity: qty as number });
+        }
+        return Array.from(map.values());
+      });
+    } catch {}
+  })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
+
 
   const handleEdit = (product: Product) => {
     setEditingProduct(product);
@@ -66,6 +88,29 @@ const ProductListPage: React.FC = () => {
     setDetailsProduct(product);
     setIsDetailsModalOpen(true);
   };
+
+  const handleAddToCart = async (product: Product, quantity: number = 1) => {
+  try {
+    const data = await addToCart(product.id, quantity); // { cart, remaining_stock }
+    setCartItems((prev) => {
+      const map = new Map<number, CartItem>(prev.map(i => [i.product.id, i]));
+      const current = map.get(product.id);
+      const newQty = (current?.quantity || 0) + quantity;
+      map.set(product.id, { product, quantity: newQty });
+      return Array.from(map.values());
+    });
+    if (data?.remaining_stock?.[product.id] !== undefined) {
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === product.id ? { ...p, stock: data.remaining_stock[product.id] } : p
+        )
+      );
+    }
+  } catch (e) {
+    console.error(e);
+    alert('Failed to add to cart');
+  }
+};
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) =>
@@ -113,6 +158,7 @@ const ProductListPage: React.FC = () => {
             onEdit={handleEdit}
             onDelete={() => handleDeleteClick(product)}
             onView={handleViewDetails}
+            onAddToCart={(p) => handleAddToCart(p)}
           />
         ))}
       </div>
@@ -155,6 +201,8 @@ const ProductListPage: React.FC = () => {
           }}
         />
       )}
+
+      <Cart items={cartItems} />
     </div>
   );
 };
