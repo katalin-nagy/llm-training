@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
+from cart import router as cart_router
 
 from config import settings
 from database import Product, create_tables, get_db
@@ -41,6 +42,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
+app.include_router(cart_router)
 
 origins = [
     "http://localhost:3000",  # a frontend címe
@@ -111,7 +113,7 @@ async def delete_product(product_id: int, db: AsyncSession = Depends(get_db)):
 
     if product is None:
         raise HTTPException(status_code=404, detail="Product not found")
-    
+
     await db.delete(product)
     await db.commit()
     return
